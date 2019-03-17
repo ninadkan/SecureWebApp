@@ -1,0 +1,30 @@
+@using System.Security.Principal
+
+@if (User.Identity.IsAuthenticated)
+{
+    <ul class="nav navbar-nav navbar-right">
+        <li class="navbar-text">Hello @User.Identity.Name!</li>
+        <li><a asp-area="AzureAD" asp-controller="Account" asp-action="SignOut">Sign out</a></li>
+    </ul>
+
+
+    <ul class="nav navbar-nav navbar-left">
+        <li class="dropdown">
+            <a data-toggle="dropdown" class="dropdown-toggle">Tasks <b class="caret"></b></a>
+            <ul role="menu" class="dropdown-menu">
+                <li><a asp-area="" asp-controller="Task" asp-action="Index">List Tasks</a></li>
+                <li><a asp-area="" asp-controller="Task" asp-action="Create">Create Task</a></li>
+            </ul>
+        </li>
+    </ul>
+
+
+
+
+}
+else
+{
+    <ul class="nav navbar-nav navbar-right">
+        <li><a asp-area="AzureAD" asp-controller="Account" asp-action="SignIn">Sign in</a></li>
+    </ul>
+}
