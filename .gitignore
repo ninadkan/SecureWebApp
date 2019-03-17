@@ -102,3 +102,17 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+# Ninad Kanthi Additions
+.vs
+
+#Python project
+FlaskWebAPI/bin
+FlaskWebAPI/env
+FlaskWebAPI/obj
+FlaskWebAPI/FlaskWebAPI.pyproj.user
+
+#Web Application
+MVCSecureApp/bin
+MVCSecureApp/obj
+MVCSecureApp/MVCSecureApp.csproj.user
+
