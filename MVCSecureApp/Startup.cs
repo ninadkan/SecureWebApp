@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.AzureAD.UI;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -36,8 +38,26 @@ namespace MVCSecureApp
                 options.MinimumSameSitePolicy = SameSiteMode.None;
             });
 
-            services.AddAuthentication(AzureADDefaults.AuthenticationScheme)
-                .AddAzureAD(options => Configuration.Bind("AzureAd", options));
+            //services.AddAuthentication(AzureADDefaults.AuthenticationScheme)
+            //    .AddAzureAD(options => Configuration.Bind("AzureAd", options));
+
+            ////services.Configure<OpenIdConnectOptions>(AzureADDefaults.OpenIdScheme, options =>
+            ////{
+            ////    options.Authority = options.Authority + "/v2.0/";         // Azure AD v2.0
+            ////    options.TokenValidationParameters.ValidateIssuer = false; // accept several tenants (here simplified)
+            ////});
+
+            services.AddAuthentication(sharedOptions =>
+            {
+                sharedOptions.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                sharedOptions.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+            })
+            .AddAzureAd(options =>
+            {
+                Configuration.Bind("AzureAd", options);
+                AzureAdOptions.Settings = options;
+            })
+            .AddCookie();
 
             services.AddMvc(options =>
             {
@@ -48,7 +68,7 @@ namespace MVCSecureApp
             })
             .SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
            
-            services.AddScoped((s) =>
+            services.AddSingleton((s) =>
             {
                 return new TaskWebAPIWrapper(
                     new Uri(Configuration["PythonWebAPI:URL"]));
