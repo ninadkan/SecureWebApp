@@ -149,5 +149,23 @@ namespace MVCSecureApp.WebAPI
             }
             return rv;
         }
+
+
+        //private async Task<string> GetAccessTokenAsync()
+        //{
+        //    var context = new AuthenticationContext(_settings.Authority);
+        //    AuthenticationResult result;
+        //    try
+        //    {
+        //        result = await context.AcquireTokenSilentAsync(_settings.ApiResourceUri, _settings.ClientId);
+        //    }
+        //    catch (AdalSilentTokenAcquisitionException)
+        //    {
+        //        DeviceCodeResult deviceCodeResult = await context.AcquireDeviceCodeAsync(_settings.ApiResourceUri, _settings.ClientId);
+        //        Console.WriteLine(deviceCodeResult.Message);
+        //        result = await context.AcquireTokenByDeviceCodeAsync(deviceCodeResult);
+        //    }
+        //    return result.AccessToken;
+        //}
     }
 }
