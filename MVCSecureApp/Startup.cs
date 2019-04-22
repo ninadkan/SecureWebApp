@@ -67,6 +67,7 @@ namespace MVCSecureApp
                 options.Filters.Add(new AuthorizeFilter(policy));
             })
             .SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
+            services.AddSession();
            
             services.AddSingleton((s) =>
             {
@@ -92,8 +93,10 @@ namespace MVCSecureApp
             app.UseStaticFiles();
             app.UseCookiePolicy();
 
-            app.UseAuthentication();
+           
 
+            app.UseSession();
+            app.UseAuthentication();
             app.UseMvc(routes =>
             {
                 routes.MapRoute(
