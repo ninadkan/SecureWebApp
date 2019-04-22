@@ -29,6 +29,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="app.py" />
+    <Compile Include="appSecrets.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="validateJWT.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="bin" />
