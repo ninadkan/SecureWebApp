@@ -59,14 +59,17 @@ namespace MVCSecureApp
             })
             .AddCookie();
 
-            services.AddMvc(options =>
-            {
-                var policy = new AuthorizationPolicyBuilder()
-                    .RequireAuthenticatedUser()
-                    .Build();
-                options.Filters.Add(new AuthorizeFilter(policy));
-            })
-            .SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
+            //services.AddMvc(options =>
+            //{
+            //    var policy = new AuthorizationPolicyBuilder()
+            //        .RequireAuthenticatedUser()
+            //        .Build();
+            //    options.Filters.Add(new AuthorizeFilter(policy));
+            //})
+            //.SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
+
+            services.AddMvc()
+               .AddSessionStateTempDataProvider();
             services.AddSession();
            
             services.AddSingleton((s) =>
