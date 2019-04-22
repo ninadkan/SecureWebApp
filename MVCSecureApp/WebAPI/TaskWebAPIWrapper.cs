@@ -3,13 +3,29 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace MVCSecureApp.WebAPI
 {
+
+    public struct ObjTaskAndHttpStatusCode
+    {
+        public Models.Task passedTask;
+        public System.Net.HttpStatusCode httpCode;
+    }
+
+    public struct ObjTaskListAndHttpStatusCode
+    {
+        public List<Models.Task> passedTaskList;
+        public System.Net.HttpStatusCode httpCode;
+    }
+
+
     public sealed class TaskWebAPIWrapper
     {
         private static HttpClient _httpClient = null;
@@ -33,88 +49,131 @@ namespace MVCSecureApp.WebAPI
             }
         }
 
-
         public static void Initialize()
         {
             _httpClient = new HttpClient();
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36");
         }
 
-        public List<Models.Task> GetCollection()
+        public async Task<ObjTaskListAndHttpStatusCode> GetCollection(AuthenticationResult token)
         {
-            List<Models.Task> rv = new List<Models.Task>();
-            var response = HttpClientInstance.GetStringAsync(_commonURL).Result;
-            JObject o = JObject.Parse(response);
-            JToken t = o.GetValue("tasks");
-            if (t != null)
+
+            ObjTaskListAndHttpStatusCode returnValue = new ObjTaskListAndHttpStatusCode
             {
-                foreach (var item in t)
+                passedTaskList = null
+            };
+
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, _commonURL);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+            HttpResponseMessage response = await HttpClientInstance.SendAsync(request);
+
+            returnValue.httpCode = response.StatusCode;
+
+            if (response.IsSuccessStatusCode)
+            {
+                JObject o = JObject.Parse(await response.Content.ReadAsStringAsync());
+                JToken t = o.GetValue("tasks");
+                if (t != null)
                 {
+                    returnValue.passedTaskList = new List<Models.Task>();
+                    foreach (var item in t)
                     {
-                        Models.Task task = JsonConvert.DeserializeObject<Models.Task>(item.ToString());
-                        Debug.Assert(task != null);
-                        rv.Add(task);
-                        Debug.WriteLine(task.Id);
-                        Debug.WriteLine(task.Description);
+                        {
+                            Models.Task task = JsonConvert.DeserializeObject<Models.Task>(item.ToString());
+                            returnValue.passedTaskList.Add(task);
+                        }
                     }
                 }
             }
-            return rv;
+            return returnValue;
         }
 
-
-        public async Task<Models.Task> CreateNew(Models.Task task)
+        public async Task<ObjTaskAndHttpStatusCode> CreateNew(Models.Task task, AuthenticationResult token)
         {
-            Models.Task rv = null;
+            ObjTaskAndHttpStatusCode returnValue = new ObjTaskAndHttpStatusCode
+            {
+                passedTask = null
+            };
+
             var jsonObject = JsonConvert.SerializeObject(task);
             var content = new StringContent(jsonObject.ToString(), Encoding.UTF8, "application/json");
-            var result = HttpClientInstance.PostAsync(_commonURL, content).Result;
-
-            if (result.IsSuccessStatusCode)
-            {
-                string strResult = await result.Content.ReadAsStringAsync();
-                rv = GetTask(strResult);
-            }
-
-            return rv;
-        }
-
-
-        public Models.Task GetDetails(int Id)
-        {
-            Models.Task rv = null;
-
-            var url = _commonURL + "/" + Id.ToString();
-            var response = HttpClientInstance.GetStringAsync(new Uri(url)).Result;
-            rv = GetTask(response);
-            return rv;
-        }
-
-        public async Task<Models.Task> Edit(Models.Task task)
-        {
-            Models.Task rv = null;
-
-            var url = _commonURL + "/" + task.Id.ToString();
-
-            var jsonObject = JsonConvert.SerializeObject(task);
-            var content = new StringContent(jsonObject.ToString(), Encoding.Unicode, "application/json");
-
-            var response = HttpClientInstance.PutAsync(new Uri(url), content).Result;
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, _commonURL);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+            request.Content = content;
+            HttpResponseMessage response = await HttpClientInstance.SendAsync(request);
+            returnValue.httpCode = response.StatusCode;
 
             if (response.IsSuccessStatusCode)
             {
                 string strResult = await response.Content.ReadAsStringAsync();
-                rv = GetTask(strResult);
+                returnValue.passedTask = GetTask(strResult);
             }
-            return rv;
+
+            return returnValue;
         }
 
-        public async Task<bool> Delete(int Id)
+        public async Task<ObjTaskAndHttpStatusCode> GetDetails(int Id, AuthenticationResult token)
         {
-            bool brv = false;
+            ObjTaskAndHttpStatusCode returnValue = new ObjTaskAndHttpStatusCode
+            {
+                passedTask = null
+            };
 
             var url = _commonURL + "/" + Id.ToString();
-            var response = HttpClientInstance.DeleteAsync(new Uri(url)).Result;
+
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+
+            HttpResponseMessage response = await HttpClientInstance.SendAsync(request);
+            returnValue.httpCode = response.StatusCode;
+
+            if (response.IsSuccessStatusCode)
+            {
+                string strResult = await response.Content.ReadAsStringAsync();
+                returnValue.passedTask = GetTask(strResult);
+            }
+            return returnValue;
+        }
+
+        public async Task<ObjTaskAndHttpStatusCode> Edit(Models.Task task, AuthenticationResult token)
+        {
+            ObjTaskAndHttpStatusCode returnValue = new ObjTaskAndHttpStatusCode
+            {
+                passedTask = null
+            };
+
+            var url = _commonURL + "/" + task.Id.ToString();
+            var jsonObject = JsonConvert.SerializeObject(task);
+            var content = new StringContent(jsonObject.ToString(), Encoding.Unicode, "application/json");
+
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Put, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+            request.Content = content;
+
+            HttpResponseMessage response = await HttpClientInstance.SendAsync(request);
+            returnValue.httpCode = response.StatusCode;
+
+            if (response.IsSuccessStatusCode)
+            {
+                string strResult = await response.Content.ReadAsStringAsync();
+                returnValue.passedTask = GetTask(strResult);
+            }
+            return returnValue;
+        }
+
+        public async Task<ObjTaskAndHttpStatusCode> Delete(int Id, AuthenticationResult token)
+        {
+            ObjTaskAndHttpStatusCode returnValue = new ObjTaskAndHttpStatusCode
+            {
+                passedTask = null
+            };
+
+            var url = _commonURL + "/" + Id.ToString();
+
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Delete, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+
+            HttpResponseMessage response = await HttpClientInstance.SendAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -125,18 +184,22 @@ namespace MVCSecureApp.WebAPI
                 {
                     try
                     {
-                        brv = Convert.ToBoolean(t.ToString());
+
+                        bool bReturnValue = Convert.ToBoolean(t.ToString());
+                        if (bReturnValue)
+                        {
+                            returnValue.passedTask = new Models.Task();
+                        }
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         Debug.WriteLine("Error");
                         Debug.WriteLine(ex.Message);
                     }
                 }
             }
-            return brv;
+            return returnValue;
         }
-
 
         private Models.Task GetTask(string strResult)
         {
@@ -150,22 +213,5 @@ namespace MVCSecureApp.WebAPI
             return rv;
         }
 
-
-        //private async Task<string> GetAccessTokenAsync()
-        //{
-        //    var context = new AuthenticationContext(_settings.Authority);
-        //    AuthenticationResult result;
-        //    try
-        //    {
-        //        result = await context.AcquireTokenSilentAsync(_settings.ApiResourceUri, _settings.ClientId);
-        //    }
-        //    catch (AdalSilentTokenAcquisitionException)
-        //    {
-        //        DeviceCodeResult deviceCodeResult = await context.AcquireDeviceCodeAsync(_settings.ApiResourceUri, _settings.ClientId);
-        //        Console.WriteLine(deviceCodeResult.Message);
-        //        result = await context.AcquireTokenByDeviceCodeAsync(deviceCodeResult);
-        //    }
-        //    return result.AccessToken;
-        //}
     }
 }
