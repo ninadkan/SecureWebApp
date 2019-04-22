@@ -24,14 +24,20 @@ def hello():
 tasks = [
      {
          'id': 1,
-         'title': u'Buy groceries',
-         'description': u'Milk, Cheese, Pizza, Fruit, Tylenol', 
+         'title': u'Clean House',
+         'description': u'Garage, Front, Lounge, Bathrooms', 
          'done': False
      },
      {
          'id': 2,
-         'title': u'Learn Python',
-         'description': u'Need to find a good Python tutorial on the web', 
+         'title': u'Exercise',
+         'description': u'Need to exercicse on the threadmill', 
+         'done': False
+     },
+    {
+         'id': 3,
+         'title': u'Blog writing',
+         'description': u'ASAP, document blog writing', 
          'done': False
      }
  ]
