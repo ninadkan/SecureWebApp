@@ -48,7 +48,7 @@ tasks = [
          'title': u'Exercise',
          'description': u'Threadmill or Walk or weights', 
          'done': False
-     }
+     },
      {
          'id': 3,
          'title': u'Write up Blog',

@@ -137,7 +137,7 @@ namespace MVCSecureApp.Controllers
         // GET: Task/Edit/5
         public async Task<ActionResult> Edit(int id)
         {
-            return await BaseEdit(id);
+            return await BaseImpl(id);
         }
 
         // POST: Task/Edit/5
@@ -185,19 +185,6 @@ namespace MVCSecureApp.Controllers
             }
         }
 
-        public async Task<ActionResult> BaseEdit(int id)
-        {
-            AuthenticationContextAndToken ctx_token = await GetTokenAndAuthenticationContext();
-            if (ctx_token.token != null)
-            {
-                return View(await _WebApiController.GetDetails(id, ctx_token.token));
-            }
-            else
-            {
-                return ErrorViewTask(UnableToAcquireToken);
-            }
-        }
-
         // GET: Task/Delete/5
         public async Task<ActionResult> Delete(int id)
         {
@@ -241,7 +228,15 @@ namespace MVCSecureApp.Controllers
             AuthenticationContextAndToken ctx_token = await GetTokenAndAuthenticationContext();
             if (ctx_token.token != null)
             {
-                return View(await _WebApiController.GetDetails(id, ctx_token.token));
+                ObjTaskAndHttpStatusCode rv = await _WebApiController.GetDetails(id, ctx_token.token);
+                if (rv.passedTask != null)
+                {
+                    return View(rv.passedTask);
+                }
+                else
+                {
+                    return CheckAuthenticationNoTaskError(rv.httpCode, ctx_token.ctx);
+                }
             }
             else
             {
@@ -303,7 +298,7 @@ namespace MVCSecureApp.Controllers
         {
             AuthenticationContextAndToken returnValue = new AuthenticationContextAndToken
             {
-                ctx = null
+                ctx = null, token = null
             };
             // Because we signed-in already in the WebApp, the userObjectId is know
             string userObjectID = (User.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier"))?.Value;
@@ -314,7 +309,5 @@ namespace MVCSecureApp.Controllers
             return returnValue;
            
         }
- 
     }
-
 }
