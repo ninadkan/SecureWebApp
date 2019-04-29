@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
@@ -57,8 +58,11 @@ namespace MVCSecureApp.Controllers
                     return ErrorViewTask(UnableToAcquireToken);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+
+                Debug.WriteLine(ex.Message);
+                Debug.WriteLine(ex.InnerException);
                 return ErrorCatchHandler(true);
             }
         }

@@ -32,6 +32,9 @@
     <Compile Include="appSecrets.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="storageBlobService.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="validateJWT.py" />
   </ItemGroup>
   <ItemGroup>
