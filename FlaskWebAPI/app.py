@@ -7,25 +7,16 @@ from flask import url_for
 from flask import request, Response
 from flask_cors import CORS
 import json
-#import jwtValidate
 import validateJWT
 import appSecrets
-import storageBlobService 
+import storageBlobService
+import securityImpl
 
 app = Flask(__name__)
 
-
-app.config['Instance'] = appSecrets.InstanceName
-app.config['Domain'] = appSecrets.DomainName
-app.config['TenantId'] = appSecrets.TenantId
-app.config['ClientId'] = appSecrets.ClientId
-app.config['account_name'] = appSecrets.AccountName
-app.config['account_key'] = appSecrets.AccountKey
-app.config['sas_token'] = appSecrets.SAS_Token
-
 CORS(app)
-jwtValidator = validateJWT.validateJWT(app)
-storageBlobWrapper = storageBlobService.StorageBlobServiceWrapper(app)
+
+securityObj = securityImpl.securityImpl()
 
 # Make the WSGI interface available at the top level so wfastcgi can get it.
 wsgi_app = app.wsgi_app
@@ -33,6 +24,10 @@ wsgi_app = app.wsgi_app
 @app.errorhandler(401)
 def custom_401(error):
     return Response('Unauthorized', 401, {'Content-Type': 'text/html', 'WWW-Authenticate':'Basic realm="Login Required"'})
+
+@app.errorhandler(400)
+def custom_400(error):
+    return Response('Unauthorized', 400, {'Content-Type': 'text/html', 'WWW-Authenticate':'Basic realm="Consent Required"'})
 
 @app.errorhandler(404)
 def not_found(error):
@@ -44,48 +39,65 @@ def hello():
     return "Hello World!"
 
 
+@app.route('/todo/api/v1.0/tasks', methods=['GET'])
+def get_tasks():
+    return coreValidationAndProcessing(request, get_tasksImpl)
+
+@app.route('/todo/api/v1.0/tasks/<int:task_id>', methods=['GET'])
+def get_task(task_id):
+    return coreValidationAndProcessing(request, get_taskImpl, task_id)
+
+@app.route('/todo/api/v1.0/tasks', methods=['POST'])
+def create_task():
+    return coreValidationAndProcessing(request, create_taskImpl)
+
+@app.route('/todo/api/v1.0/tasks/<int:task_id>', methods=['PUT'])
+def update_task(task_id):
+    return coreValidationAndProcessing(request, update_taskImpl, task_id)
+
+@app.route('/todo/api/v1.0/tasks/<int:task_id>', methods=['DELETE'])
+def delete_task(task_id):
+    return coreValidationAndProcessing(request, delete_taskImpl, task_id)
+
+def coreValidationAndProcessing(request, funcInvoke, task_id=None):
+    global securityObj
+    bRV, response = securityObj.validateRequest(request)
+    if (bRV):
+        tasks, storageBlobWrapper = readContentIntoTasks()
+        if (task_id):
+            return funcInvoke(task_id, tasks, storageBlobWrapper,request)
+        else:
+            return funcInvoke(tasks, storageBlobWrapper,request)
+    else:
+	    # need to ensure that we are returning an error response
+        if((response.status_code >= 200) and (response.status_code < 300)):
+            return make_response(jsonify({'error': response.text}), 404)
+        else:
+            return make_response(jsonify({'error': response.text}), response.status_code)
+
 def readContentIntoTasks():
-    global storageBlobWrapper
+    global securityObj
+    storageBlobWrapper = securityObj.get_StorageObject()
     content = storageBlobWrapper.get_blob_content()
     tasks = None
     if (content and len(content)>0):
         tasks = json.loads(content)
-    return tasks
+    return tasks, storageBlobWrapper
 
-@app.route('/todo/api/v1.0/tasks', methods=['GET'])
-def get_tasks():
-    global jwtValidator
-    if not(jwtValidator.validate_request(request)):
-        abort(401)
-    tasks = readContentIntoTasks()
+def get_tasksImpl(tasks, storageBlobWrapper, request):
     return jsonify({'tasks': tasks})
 
-@app.route('/todo/api/v1.0/tasks/<int:task_id>', methods=['GET'])
-def get_task(task_id):
-    global jwtValidator
-    if not(jwtValidator.validate_request(request)):
-        abort(401)
-
-    tasks = readContentIntoTasks()
+def get_taskImpl(task_id, tasks, storageBlobWrapper, request):
     if (tasks == None or len(tasks) == 0):
         abort(404)
-
     task = [task for task in tasks if task['id'] == task_id]
     if len(task) == 0:
         abort(404)
     return jsonify({'task': task[0]})
 
-
-@app.route('/todo/api/v1.0/tasks', methods=['POST'])
-def create_task():
-    global jwtValidator
-    if not(jwtValidator.validate_request(request)):
-        abort(401)
-
+def create_taskImpl(tasks, storageBlobWrapper, request):
     if not request.json or not 'title' in request.json:
         abort(400)
-
-    tasks = readContentIntoTasks()
 
     if (tasks == None or len(tasks) == 0):
         tasks = list()
@@ -106,14 +118,7 @@ def create_task():
     storageBlobWrapper.update_blob_content(json.dumps(tasks))
     return jsonify({'task': task}), 201
 
-@app.route('/todo/api/v1.0/tasks/<int:task_id>', methods=['PUT'])
-def update_task(task_id):
-    global jwtValidator
-    if not(jwtValidator.validate_request(request)):
-        abort(401)
-
-    tasks = readContentIntoTasks()
-
+def update_taskImpl(task_id, tasks, storageBlobWrapper, request):
     if (tasks == None or len(tasks) == 0):
         abort(404)
 
@@ -141,13 +146,7 @@ def update_task(task_id):
     storageBlobWrapper.update_blob_content(json.dumps(tasks))       
     return jsonify({'task': task[0]})
 
-@app.route('/todo/api/v1.0/tasks/<int:task_id>', methods=['DELETE'])
-def delete_task(task_id):
-    global jwtValidator
-    if not(jwtValidator.validate_request(request)):
-        abort(401)
-
-    tasks = readContentIntoTasks()
+def delete_taskImpl(task_id, tasks, storageBlobWrapper, request):
     if (tasks == None or len(tasks) == 0):
         abort(404)
 
@@ -158,8 +157,6 @@ def delete_task(task_id):
     tasks.remove(task[0])
     storageBlobWrapper.update_blob_content(json.dumps(tasks))     
     return jsonify({'result': True})
-
-
 
 if __name__ == '__main__':
     import os

@@ -18,6 +18,12 @@
     <RootNamespace>FlaskWebAPI</RootNamespace>
     <InterpreterId>MSBuild|env|$(MSBuildProjectFullPath)</InterpreterId>
     <WebBrowserPort>5555</WebBrowserPort>
+    <Environment>
+    </Environment>
+    <PythonRunWebServerCommandEnvironment>
+    </PythonRunWebServerCommandEnvironment>
+    <PythonDebugWebServerCommandEnvironment>
+    </PythonDebugWebServerCommandEnvironment>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -30,6 +36,9 @@
   <ItemGroup>
     <Compile Include="app.py" />
     <Compile Include="appSecrets.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="securityImpl.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="storageBlobService.py">

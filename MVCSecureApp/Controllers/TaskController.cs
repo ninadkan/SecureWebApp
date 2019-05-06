@@ -55,6 +55,7 @@ namespace MVCSecureApp.Controllers
                 }
                 else
                 {
+
                     return ErrorViewTask(UnableToAcquireToken);
                 }
             }
@@ -262,16 +263,25 @@ namespace MVCSecureApp.Controllers
             if (statusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 // clear cache. 
-                var todoTokens = authContext.TokenCache.ReadItems().Where(a => a.Resource == AzureAdOptions.Settings.WebAPIResourceId);
-                foreach (TokenCacheItem tci in todoTokens)
-                    authContext.TokenCache.DeleteItem(tci);
-
+                clearCache(authContext);
                 return RedirectToAction("AccessDenied", "Account");
             }
             else
             {
+                if (statusCode == System.Net.HttpStatusCode.BadRequest)
+                {
+                    clearCache(authContext);
+                    //return new ChallengeResult(OpenIdConnectDefaults.AuthenticationScheme);
+                }
                 return ErrorViewTask(NoTaskReturned);
             }
+        }
+
+        private void clearCache(AuthenticationContext authContext)
+        {
+            var todoTokens = authContext.TokenCache.ReadItems().Where(a => a.Resource == AzureAdOptions.Settings.WebAPIResourceId);
+            foreach (TokenCacheItem tci in todoTokens)
+                authContext.TokenCache.DeleteItem(tci);
         }
 
         private ActionResult ErrorViewTaskList(string errorMessage, string ViewBagErrorMessage = ErrorViewModel.ErrorUnexpectedError)
