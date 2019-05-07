@@ -16,13 +16,13 @@ namespace MVCSecureApp.WebAPI
     public struct ObjTaskAndHttpStatusCode
     {
         public Models.Task passedTask;
-        public System.Net.HttpStatusCode httpCode;
+        public HttpResponseMessage responseReceived;
     }
 
     public struct ObjTaskListAndHttpStatusCode
     {
         public List<Models.Task> passedTaskList;
-        public System.Net.HttpStatusCode httpCode;
+        public HttpResponseMessage responseReceived;
     }
 
 
@@ -60,18 +60,16 @@ namespace MVCSecureApp.WebAPI
 
             ObjTaskListAndHttpStatusCode returnValue = new ObjTaskListAndHttpStatusCode
             {
-                passedTaskList = null
+                passedTaskList = null, responseReceived = null
             };
 
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, _commonURL);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
-            HttpResponseMessage response = await HttpClientInstance.SendAsync(request);
+            returnValue.responseReceived = await HttpClientInstance.SendAsync(request);
 
-            returnValue.httpCode = response.StatusCode;
-
-            if (response.IsSuccessStatusCode)
+            if (returnValue.responseReceived.IsSuccessStatusCode)
             {
-                JObject o = JObject.Parse(await response.Content.ReadAsStringAsync());
+                JObject o = JObject.Parse(await returnValue.responseReceived.Content.ReadAsStringAsync());
                 JToken t = o.GetValue("tasks");
                 if (t != null)
                 {
@@ -92,7 +90,8 @@ namespace MVCSecureApp.WebAPI
         {
             ObjTaskAndHttpStatusCode returnValue = new ObjTaskAndHttpStatusCode
             {
-                passedTask = null
+                passedTask = null,
+                responseReceived = null
             };
 
             var jsonObject = JsonConvert.SerializeObject(task);
@@ -100,12 +99,10 @@ namespace MVCSecureApp.WebAPI
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, _commonURL);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
             request.Content = content;
-            HttpResponseMessage response = await HttpClientInstance.SendAsync(request);
-            returnValue.httpCode = response.StatusCode;
-
-            if (response.IsSuccessStatusCode)
+            returnValue.responseReceived = await HttpClientInstance.SendAsync(request);
+            if (returnValue.responseReceived.IsSuccessStatusCode)
             {
-                string strResult = await response.Content.ReadAsStringAsync();
+                string strResult = await returnValue.responseReceived.Content.ReadAsStringAsync();
                 returnValue.passedTask = GetTask(strResult);
             }
 
@@ -116,20 +113,19 @@ namespace MVCSecureApp.WebAPI
         {
             ObjTaskAndHttpStatusCode returnValue = new ObjTaskAndHttpStatusCode
             {
-                passedTask = null
+                passedTask = null,
+                responseReceived = null
             };
 
             var url = _commonURL + "/" + Id.ToString();
 
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+            returnValue.responseReceived = await HttpClientInstance.SendAsync(request);
 
-            HttpResponseMessage response = await HttpClientInstance.SendAsync(request);
-            returnValue.httpCode = response.StatusCode;
-
-            if (response.IsSuccessStatusCode)
+            if (returnValue.responseReceived.IsSuccessStatusCode)
             {
-                string strResult = await response.Content.ReadAsStringAsync();
+                string strResult = await returnValue.responseReceived.Content.ReadAsStringAsync();
                 returnValue.passedTask = GetTask(strResult);
             }
             return returnValue;
@@ -139,7 +135,8 @@ namespace MVCSecureApp.WebAPI
         {
             ObjTaskAndHttpStatusCode returnValue = new ObjTaskAndHttpStatusCode
             {
-                passedTask = null
+                passedTask = null,
+                responseReceived = null
             };
 
             var url = _commonURL + "/" + task.Id.ToString();
@@ -150,12 +147,10 @@ namespace MVCSecureApp.WebAPI
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
             request.Content = content;
 
-            HttpResponseMessage response = await HttpClientInstance.SendAsync(request);
-            returnValue.httpCode = response.StatusCode;
-
-            if (response.IsSuccessStatusCode)
+            returnValue.responseReceived = await HttpClientInstance.SendAsync(request);
+            if (returnValue.responseReceived.IsSuccessStatusCode)
             {
-                string strResult = await response.Content.ReadAsStringAsync();
+                string strResult = await returnValue.responseReceived.Content.ReadAsStringAsync();
                 returnValue.passedTask = GetTask(strResult);
             }
             return returnValue;
@@ -165,19 +160,19 @@ namespace MVCSecureApp.WebAPI
         {
             ObjTaskAndHttpStatusCode returnValue = new ObjTaskAndHttpStatusCode
             {
-                passedTask = null
+                passedTask = null,
+                responseReceived = null
             };
 
             var url = _commonURL + "/" + Id.ToString();
 
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Delete, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+            returnValue.responseReceived = await HttpClientInstance.SendAsync(request);
 
-            HttpResponseMessage response = await HttpClientInstance.SendAsync(request);
-
-            if (response.IsSuccessStatusCode)
+            if (returnValue.responseReceived.IsSuccessStatusCode)
             {
-                string strResult = await response.Content.ReadAsStringAsync();
+                string strResult = await returnValue.responseReceived.Content.ReadAsStringAsync();
                 JObject o = JObject.Parse(strResult);
                 JToken t = o.GetValue("result");
                 if (t != null)

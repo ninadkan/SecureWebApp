@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
 using MVCSecureApp.Utils;
+using MVCSecureApp.Models;
 
 namespace MVCSecureApp.Controllers
 {
@@ -17,8 +18,25 @@ namespace MVCSecureApp.Controllers
         public IActionResult SignIn()
         {
             var redirectUrl = Url.Action(nameof(HomeController.Index), "Home");
+
+            var authenticationProperties = new AuthenticationProperties
+            {
+                RedirectUri = redirectUrl,
+                AllowRefresh = true
+            };
+
+            string cookieValueFromContext = HttpContext.Request.Cookies[ErrorViewModel.PromptConsentCookie];
+
+            //read cookie from Request object  
+            if (!string.IsNullOrWhiteSpace(cookieValueFromContext))
+            { 
+                authenticationProperties.Items["prompt"] = "consent";
+                // Remove the cookie such that the next time login does not ask for the consent once again
+                HttpContext.Response.Cookies.Delete(ErrorViewModel.PromptConsentCookie);
+            }
+            
             return Challenge(
-                new AuthenticationProperties { RedirectUri = redirectUrl, AllowRefresh = true },
+                authenticationProperties,
                 OpenIdConnectDefaults.AuthenticationScheme);
         }
 

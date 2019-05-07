@@ -13,6 +13,20 @@
     </p>
 }
 
+@if (Model.ShowErrorHeader)
+{
+    <p>
+        <strong>Error :</strong> <code>@Model.ErrorHeader</code>
+    </p>
+}
+
+@if (Model.ShowErrorDescription)
+{
+    <p>
+        <strong>Error Description:</strong> <code>@Model.ErrorDescription</code>
+    </p>
+}
+
 <h3>Development Mode</h3>
 <p>
     Swapping to <strong>Development</strong> environment will display more detailed information about the error that occurred.

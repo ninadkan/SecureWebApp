@@ -8,7 +8,6 @@ using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using MVCSecureApp.Utils;
 
 
-
 namespace Microsoft.AspNetCore.Authentication
 {
     public static class AzureAdAuthenticationBuilderExtensions
@@ -46,10 +45,21 @@ namespace Microsoft.AspNetCore.Authentication
                 // but instead OnTokenValidated event is called. Here we request both so that OnTokenValidated is called first which 
                 // ensures that context.Principal has a non-null value when OnAuthorizeationCodeReceived is called
                 options.ResponseType = "id_token code";
+                //options.Prompt = "consent";
 
                 // Subscribing to the OIDC events
                 options.Events.OnAuthorizationCodeReceived = OnAuthorizationCodeReceived;
                 options.Events.OnAuthenticationFailed = OnAuthenticationFailed;
+                options.Events.OnRedirectToIdentityProvider = OnRedirectToIdentityProvider;
+            }
+
+            private Task OnRedirectToIdentityProvider(RedirectContext arg)
+            {
+                if (arg.Properties.Items.TryGetValue("prompt", out string prompt))
+                {
+                    arg.ProtocolMessage.Prompt = prompt;
+                }
+                return Task.CompletedTask;
             }
 
             public void Configure(OpenIdConnectOptions options)

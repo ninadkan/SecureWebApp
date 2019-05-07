@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -13,10 +16,10 @@ using MVCSecureApp.Models;
 using MVCSecureApp.Utils;
 using MVCSecureApp.WebAPI;
 
+using Newtonsoft.Json.Linq;
+
 namespace MVCSecureApp.Controllers
 {
-
-
     struct AuthenticationContextAndToken
     {
         public AuthenticationContext ctx;
@@ -50,23 +53,20 @@ namespace MVCSecureApp.Controllers
                     }
                     else
                     {
-                        return CheckAuthenticationNoTaskError(rv.httpCode, ctx_token.ctx);
+                        return CheckAuthenticationNoTaskError(rv.responseReceived, ctx_token.ctx, true);
                     }
                 }
                 else
                 {
-
-                    return ErrorViewTask(UnableToAcquireToken);
+                    return Error(UnableToAcquireToken, "");
                 }
             }
             catch (Exception ex)
             {
-
-                Debug.WriteLine(ex.Message);
-                Debug.WriteLine(ex.InnerException);
-                return ErrorCatchHandler(true);
+                return DisplayExceptionError(ex);
             }
         }
+
 
         // GET: Task/Details/5
         public async Task<ActionResult> Details(int id)
@@ -83,17 +83,17 @@ namespace MVCSecureApp.Controllers
                     }
                     else
                     {
-                        return CheckAuthenticationNoTaskError(rv.httpCode, ctx_token.ctx);
+                        return CheckAuthenticationNoTaskError(rv.responseReceived, ctx_token.ctx);
                     }
                 }
                 else
                 {
-                    return ErrorViewTask(UnableToAcquireToken);
+                    return Error(UnableToAcquireToken, "");
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                return ErrorCatchHandler();
+                return DisplayExceptionError(ex);
             }
         }
 
@@ -125,17 +125,17 @@ namespace MVCSecureApp.Controllers
                     }
                     else
                     {
-                        return CheckAuthenticationNoTaskError(rv.httpCode, ctx_token.ctx);
+                        return CheckAuthenticationNoTaskError(rv.responseReceived, ctx_token.ctx);
                     }
                 }
                 else
                 {
-                    return ErrorViewTask(UnableToAcquireToken);
+                    return Error(UnableToAcquireToken, "");
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                return ErrorCatchHandler();
+                return DisplayExceptionError(ex);
             }
         }
 
@@ -167,7 +167,10 @@ namespace MVCSecureApp.Controllers
                         string doneString = collection["Done"];
                         task.Done = Convert.ToBoolean(doneString.Split(',')[0]);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        return Error(ex.Message, ex.InnerException.ToString());
+                    }
 
                     ObjTaskAndHttpStatusCode rv = await _WebApiController.Edit(task, ctx_token.token);
                     if (rv.passedTask != null)
@@ -176,17 +179,17 @@ namespace MVCSecureApp.Controllers
                     }
                     else
                     {
-                        return CheckAuthenticationNoTaskError(rv.httpCode, ctx_token.ctx);
+                        return CheckAuthenticationNoTaskError(rv.responseReceived, ctx_token.ctx);
                     }
                 }
                 else
                 {
-                    return ErrorViewTask(UnableToAcquireToken);
+                    return Error(UnableToAcquireToken, "");
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                return ErrorCatchHandler();
+                return DisplayExceptionError(ex);
             }
         }
 
@@ -214,17 +217,17 @@ namespace MVCSecureApp.Controllers
                     }
                     else
                     {
-                        return CheckAuthenticationNoTaskError(rv.httpCode, ctx_token.ctx);
+                        return CheckAuthenticationNoTaskError(rv.responseReceived, ctx_token.ctx);
                     }
                 }
                 else
                 {
-                    return ErrorViewTask(UnableToAcquireToken);
+                    return Error(UnableToAcquireToken, "");
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                return ErrorCatchHandler();
+                return DisplayExceptionError(ex);
             }
         }
 
@@ -240,27 +243,31 @@ namespace MVCSecureApp.Controllers
                 }
                 else
                 {
-                    return CheckAuthenticationNoTaskError(rv.httpCode, ctx_token.ctx);
+                    return CheckAuthenticationNoTaskError(rv.responseReceived, ctx_token.ctx);
                 }
             }
             else
             {
-                return ErrorViewTask(UnableToAcquireToken);
+                return Error(UnableToAcquireToken, "");
             }
         }
 
-        private ViewResult ErrorViewTask(string errorMessage, string ViewBagErrorMessage = ErrorViewModel.ErrorUnexpectedError)
+        private ActionResult DisplayExceptionError(Exception ex)
         {
-            Models.Task task = new Models.Task();
-            task.Description = errorMessage;
-            task.Title = "Error ! " + errorMessage;
-            ViewBag.ErrorMessage = ViewBagErrorMessage;
-            return View(task);
+            if (ex.InnerException != null)
+            {
+                return Error(ex.Message, ex.InnerException.ToString());
+            }
+            else
+            {
+                return Error(ex.Message, "");
+            }
         }
 
-        private ActionResult CheckAuthenticationNoTaskError(System.Net.HttpStatusCode statusCode, AuthenticationContext authContext)
+
+        private ActionResult CheckAuthenticationNoTaskError(System.Net.Http.HttpResponseMessage responseReceived, AuthenticationContext authContext, bool bList = false)
         {
-            if (statusCode == System.Net.HttpStatusCode.Unauthorized)
+            if (responseReceived.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 // clear cache. 
                 clearCache(authContext);
@@ -268,13 +275,79 @@ namespace MVCSecureApp.Controllers
             }
             else
             {
-                if (statusCode == System.Net.HttpStatusCode.BadRequest)
+                if (responseReceived.StatusCode == System.Net.HttpStatusCode.BadRequest)
                 {
                     clearCache(authContext);
                     //return new ChallengeResult(OpenIdConnectDefaults.AuthenticationScheme);
                 }
-                return ErrorViewTask(NoTaskReturned);
             }
+
+            bool displayConsentScreen = false;
+            string displayString = ConsentScreenDisplay(responseReceived, out displayConsentScreen);
+
+            if (displayConsentScreen)
+            {
+                string userObjectID = User.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier").Value;
+                CookieOptions option = new CookieOptions();
+                option.Expires = DateTime.Now.AddMinutes(60);
+                Response.Cookies.Append(ErrorViewModel.PromptConsentCookie, userObjectID, option);
+                return Error("Consent Required!", "Signout and Sign back in again with current user");
+            }
+            else
+            {
+                return Error(responseReceived.ReasonPhrase, displayString);
+            }
+
+        }
+
+        private string ConsentScreenDisplay(System.Net.Http.HttpResponseMessage responseReceived, out bool displayConsentScreen)
+        {
+            displayConsentScreen = false; 
+            var sB = new StringBuilder();
+
+            bool bFound = false;
+            foreach (var item in responseReceived.Headers)
+            {
+                if ("WWW-Authenticate".Equals(item.Key) || ("Content".Equals(item.Key)))
+                {
+                    string strValue = item.Value.FirstOrDefault();
+                    sB.Append(strValue);
+
+                    // investigate the content if it contains anything stating that consent is required. 
+                    try
+                    {
+                        JObject jobj = JObject.Parse(strValue);
+                        foreach (var strItem in jobj)
+                        {
+                            Debug.WriteLine(strItem.Key);
+                            Debug.WriteLine(strItem.Value);
+
+                            JValue jv = strItem.Value as JValue;
+                            if (jv != null)
+                            {
+                                string str = jv.Value as string;
+                                if (str != null)
+                                {
+                                    if (str.Contains("has not consented to use the application") || (str.Contains("consent_required")))
+                                    {
+                                        Debug.WriteLine("We need to display the consent screen here");
+                                        displayConsentScreen = true;
+                                        bFound = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                if (bFound)
+                {
+                    break;
+                }
+            }
+            return sB.ToString(); 
         }
 
         private void clearCache(AuthenticationContext authContext)
@@ -284,28 +357,18 @@ namespace MVCSecureApp.Controllers
                 authContext.TokenCache.DeleteItem(tci);
         }
 
-        private ActionResult ErrorViewTaskList(string errorMessage, string ViewBagErrorMessage = ErrorViewModel.ErrorUnexpectedError)
-        {
-            List<Models.Task> tempList = new List<Models.Task>();
-            Models.Task task = new Models.Task();
-            task.Description = errorMessage;
-            task.Title = "Error ! " + errorMessage;
-            tempList.Add(task);
-            ViewBag.ErrorMessage = ViewBagErrorMessage;
-            return View(tempList);
-        }
 
-        private ActionResult ErrorCatchHandler(bool bList = false)
+
+        [AllowAnonymous]
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public ActionResult Error(string errorHeader, string errorDescription)
         {
-            if (HttpContext.Request.Query["reauth"] == "True")
+            return View("Error",new ErrorViewModel
             {
-                return new ChallengeResult(OpenIdConnectDefaults.AuthenticationScheme);
-            }
-            if (bList)
-            { return ErrorViewTaskList("(Sign-in required to view to do list.)", ErrorViewModel.ErrorAuthorizationRequired); }
-            else
-            { return ErrorViewTask("(Sign-in required to view to do list.)", ErrorViewModel.ErrorAuthorizationRequired); }
-            
+                RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier,
+                ErrorDescription = errorDescription,
+                ErrorHeader = errorHeader
+            });
         }
 
         private async Task<AuthenticationContextAndToken> GetTokenAndAuthenticationContext()

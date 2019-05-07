@@ -61,7 +61,7 @@ def delete_task(task_id):
 
 def coreValidationAndProcessing(request, funcInvoke, task_id=None):
     global securityObj
-    bRV, response = securityObj.validateRequest(request)
+    bRV, re = securityObj.validateRequest(request)
     if (bRV):
         tasks, storageBlobWrapper = readContentIntoTasks()
         if (task_id):
@@ -69,11 +69,33 @@ def coreValidationAndProcessing(request, funcInvoke, task_id=None):
         else:
             return funcInvoke(tasks, storageBlobWrapper,request)
     else:
-	    # need to ensure that we are returning an error response
-        if((response.status_code >= 200) and (response.status_code < 300)):
-            return make_response(jsonify({'error': response.text}), 404)
+        return constructResponseObject(re)
+
+def constructResponseObject(responsePassed):
+    """
+    constructs an Error response object, even if the 
+    """
+    if (not (responsePassed is None)):
+        temp_resp = Response()
+        temp_resp.status_code = responsePassed.status_code or 404
+        if((temp_resp.status_code >= 200) and (temp_resp.status_code < 300)):
+            temp_resp.status_code = 404
+            temp_resp.reason = 'Bad Request'
+            details = 'UnexpectedError'
+            temp_resp.headers = {'Content-Type': 'text/html', 'Warning': details}
         else:
-            return make_response(jsonify({'error': response.text}), response.status_code)
+            temp_resp.reason = responsePassed.reason or 'Bad Request'
+            details = responsePassed.content or 'UnexpectedError'
+            temp_resp.headers = {'Content-Type': 'text/html', 'WWW-Authenticate': details}
+    else:
+        temp_resp = Response()
+        temp_resp.reason = 'Bad Request'
+        temp_resp.status_code = 404
+        details = 'UnexpectedError'
+        temp_resp.headers = {'Content-Type': 'text/html', 'WWW-Authenticate': details}
+
+    return temp_resp
+
 
 def readContentIntoTasks():
     global securityObj
