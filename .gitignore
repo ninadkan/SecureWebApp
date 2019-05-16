@@ -1,6 +1,7 @@
 FlaskWebAPI/appSecrets.py
 MVCSecureApp/appsettings.json
 MVCSecureApp/appsettings.json
+MVCSecureAppV2/appsettings.json
 doNotAdd/
 # Byte-compiled / optimized / DLL files
 __pycache__/
