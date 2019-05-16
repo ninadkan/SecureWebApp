@@ -5,7 +5,14 @@ VisualStudioVersion = 15.0.28010.2050
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "FlaskWebAPI", "FlaskWebAPI\FlaskWebAPI.pyproj", "{1802486B-8C4E-42E7-B2FC-4A80D6ABABD6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MVCSecureApp", "MVCSecureApp\MVCSecureApp.csproj", "{A8CEC4D5-AF01-4E11-8C99-025211F73C7C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MVCSecureApp", "MVCSecureApp\MVCSecureApp.csproj", "{A8CEC4D5-AF01-4E11-8C99-025211F73C7C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{0128C8C1-EFFC-4D4E-96DA-6207F164838D}"
+	ProjectSection(SolutionItems) = preProject
+		CreateEnvironment.ps1 = CreateEnvironment.ps1
+		parameters.ps1 = parameters.ps1
+		TearDownEnvironment.ps1 = TearDownEnvironment.ps1
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

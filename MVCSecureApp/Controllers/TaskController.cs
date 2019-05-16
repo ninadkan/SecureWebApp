@@ -363,6 +363,24 @@ namespace MVCSecureApp.Controllers
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public ActionResult Error(string errorHeader, string errorDescription)
         {
+            string stringtoLookFor = "has not consented to use the application";
+            string additionalString = "consent_required"; 
+            if (errorHeader.Contains(stringtoLookFor) || (errorHeader.Contains(additionalString) ||
+                errorDescription.Contains(stringtoLookFor) || (errorDescription.Contains(additionalString))))
+            {
+                string userObjectID = User.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier").Value;
+                CookieOptions option = new CookieOptions();
+                option.Expires = DateTime.Now.AddMinutes(60);
+                Response.Cookies.Append(ErrorViewModel.PromptConsentCookie, userObjectID, option);
+                //return View("Error", 
+                //    new ErrorViewModel
+                //    {
+                //        RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier,
+                //        ErrorDescription = errorDescription,
+                //        ErrorHeader = errorHeader
+                //    });
+            }
+
             return View("Error",new ErrorViewModel
             {
                 RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier,
