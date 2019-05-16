@@ -126,3 +126,7 @@ MVCSecureApp/MVCSecureApp.csproj.user
 
 /FlaskWebAPI/DoNotAddd.txt
 /FlaskWebAPI/Error Messages.txt
+
+MVCSecureAppV2/bin
+MVCSecureAppV2/obj
+
