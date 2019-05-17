@@ -38,7 +38,7 @@ namespace MVCSecureAppV2.Controllers
         {
             //try
             //{
-                PythonWebAPIClient client = GetPythonWebServiceClient(new[] { Constants.ScopeUserImpersonation });
+                PythonWebAPIClient client = GetPythonWebServiceClient(new[] { Constants.BearerAuthorizationScheme, Constants.ScopeUserImpersonation });
                 ObjTaskListAndHttpStatusCode rv = await client.GetCollection();
                 if (rv.passedTaskList != null)
                 {

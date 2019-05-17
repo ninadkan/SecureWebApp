@@ -17,14 +17,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		TearDownEnvironment.ps1 = TearDownEnvironment.ps1
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MVCSecureAppV2", "MVCSecureAppV2\MVCSecureAppV2.csproj", "{CFF1DB7F-58D8-4F52-AB4D-74F5784EF15E}"
-	ProjectSection(ProjectDependencies) = postProject
-		{1802486B-8C4E-42E7-B2FC-4A80D6ABABD6} = {1802486B-8C4E-42E7-B2FC-4A80D6ABABD6}
-		{894F12C7-70C6-43DC-AD58-516F95AEF633} = {894F12C7-70C6-43DC-AD58-516F95AEF633}
-	EndProjectSection
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Microsoft.Identity.Web", "..\ad\all\adv2-aspnet-core\Microsoft.Identity.Web\Microsoft.Identity.Web.csproj", "{894F12C7-70C6-43DC-AD58-516F95AEF633}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,14 +31,6 @@ Global
 		{A8CEC4D5-AF01-4E11-8C99-025211F73C7C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A8CEC4D5-AF01-4E11-8C99-025211F73C7C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A8CEC4D5-AF01-4E11-8C99-025211F73C7C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CFF1DB7F-58D8-4F52-AB4D-74F5784EF15E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CFF1DB7F-58D8-4F52-AB4D-74F5784EF15E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CFF1DB7F-58D8-4F52-AB4D-74F5784EF15E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CFF1DB7F-58D8-4F52-AB4D-74F5784EF15E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{894F12C7-70C6-43DC-AD58-516F95AEF633}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{894F12C7-70C6-43DC-AD58-516F95AEF633}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{894F12C7-70C6-43DC-AD58-516F95AEF633}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{894F12C7-70C6-43DC-AD58-516F95AEF633}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
