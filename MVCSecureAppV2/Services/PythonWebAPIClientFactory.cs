@@ -7,7 +7,7 @@ namespace MVCSecureAppV2.Services
 {
     public class PythonWebAPIClientFactory
     {
-        public static PythonWebAPIClient GetAuthenticatedGraphClient(Func<Task<string>> acquireAccessToken,
+        public static PythonWebAPIClient GetAuthenticatedPythonWebClient(Func<Task<string>> acquireAccessToken,
                                                                                  string baseUrl)
         {
             return new PythonWebAPIClient(baseUrl, new CustomAuthenticationProvider(acquireAccessToken));

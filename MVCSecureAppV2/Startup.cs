@@ -14,6 +14,13 @@ using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
+// ******************** Added Code *************
+using Microsoft.Identity.Web;
+using Microsoft.Identity.Web.Client.TokenCacheProviders;
+using MVCSecureAppV2.Infrastructure;
+using MVCSecureAppV2.Services;
+// ********************************************
+
 namespace MVCSecureAppV2
 {
     public class Startup
@@ -35,8 +42,25 @@ namespace MVCSecureAppV2
                 options.MinimumSameSitePolicy = SameSiteMode.None;
             });
 
-            services.AddAuthentication(AzureADDefaults.AuthenticationScheme)
-                .AddAzureAD(options => Configuration.Bind("AzureAd", options));
+            // ******************** Original Code *************
+            //services.AddAuthentication(AzureADDefaults.AuthenticationScheme)
+            //    .AddAzureAD(options => Configuration.Bind("AzureAd", options));
+            // ************************************************
+
+
+            // ******************** Added Code *************
+            services.AddOptions();
+            
+
+            // Token acquisition service based on MSAL.NET
+            // and chosen token cache implementation
+            services.AddAzureAdV2Authentication(Configuration)
+                    .AddMsal(new string[] { Constants.ScopeUserRead })
+                    .AddInMemoryTokenCaches();
+
+            // Add Graph
+            services.AddPythonWebAPIService(Configuration);
+            // ********************************************
 
             services.AddMvc(options =>
             {
