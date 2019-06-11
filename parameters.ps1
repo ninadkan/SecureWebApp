@@ -1,10 +1,6 @@
 ﻿$RESOURCEGROUP_NAME="ninadkanthi.com"
 $LOCATION="North Europe"
-#$SUBSCRIPTION="ninadkanthi.co.uk"
-$SUBSCRIPTION_ID="ba1d4485-2ac1-4c28-be39-56e5a0f0185c"
-#
-#$globalTenantId="11d7dd26-e356-45eb-9d28-7c2f7c86882a"
-$globalTenantId="d3f823f0-2418-4808-96f0-4eaba79f24ae"
+$globalTenantId="<<EnterYourTenantIDHERE>>"
 
 $groupAdminName = "Admin_group"
 $groupResearcherName = "Researcher_group"

@@ -16,7 +16,7 @@ class securityImpl:
     """
     def __init__(self):
         self.jwtValidator = validateJWT()
-        self.valid_audiences = [appSecrets.ClientId]
+        self.valid_audiences = [appSecrets.ClientId, appSecrets.serviceIdentifierUri]
 		#self.ClientId = appSecrets.ClientId
 		#self.ClientSecret = appSecrets.ClientSecret
 		#self.TenantId = appSecrets.TenantId

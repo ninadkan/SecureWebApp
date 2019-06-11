@@ -33,7 +33,7 @@ namespace MVCSecureAppV2.Controllers
 
 
 
-        [MsalUiRequiredExceptionFilter(Scopes = new[] { Constants.ScopeUserRead })]
+        [MsalUiRequiredExceptionFilter(Scopes = new[] { Constants.ScopeUserRead, Constants.BearerAuthorizationScheme, Constants.ScopeUserImpersonation })]
         public async Task<IActionResult> Index()
         {
             //try

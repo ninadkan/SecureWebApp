@@ -17,7 +17,7 @@ class validateJWT(object):
     key again and again. 
     """
     def __init__(self):
-        self.valid_audiences = [appSecrets.ClientId]
+        self.valid_audiences = [appSecrets.ClientId,appSecrets.serviceIdentifierUri]
         self.Instance = appSecrets.InstanceName
         self.TenantId = appSecrets.TenantId
         self.Public_Key = None
@@ -41,7 +41,7 @@ class validateJWT(object):
         bRV = False
 
         if (self.Public_Key == None or self.Issuer == None):
-            #print('Getting public key for the first time... ')
+            print('Getting public key for the first time... ')
             #if __debug__:
             #    import webbrowser
             #    url = 'https://jwt.ms/#id_token=' + jwt_to_validate

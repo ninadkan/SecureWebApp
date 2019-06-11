@@ -2,38 +2,29 @@
 # Pre-requisites
 
 . "$PSScriptRoot\parameters.ps1"
+. "$PSScriptRoot\login.ps1"
+
+# Call the following once to clear cache 
+# Disconnect-AzureAD
+# Disconnect-AzAccount
 
 # sign in
-Write-Host -ForegroundColor DarkYellow "Logging in...";
-$creds = Connect-AzureAD -TenantId $globalTenantId
+Write-Host -ForegroundColor DarkYellow "Azure AD Logging in...";
+
+$passwd = ConvertTo-SecureString '<<EnterYourPasswordHere>>' -AsPlainText -Force
+$pscredential = New-Object System.Management.Automation.PSCredential('<<EnterYourUserNAMEHERE>>', $passwd)
+$creds = Connect-AzureAD -Credential $pscredential -TenantId '<<EnterYourTenantIDHere>>' -AzureEnvironmentName AzureCloud
+
+
+
 $displayName = $creds.Account.Id
 $onlyName = $displayName.Substring(0,$displayName.IndexOf('@'))
-#$user = Get-AzureADUser -All $true |Where-Object {$_.userPrincipalName - "$onlyName"}
 $user = Get-AzureADUSer -Filter "startswith(UserPrincipalName, '$onlyName')"
 
 if ($user)
 {
-    # select subscription
-    Write-Host -ForegroundColor DarkYellow "Selecting subscription '$SUBSCRIPTION'"
-    Select-AzSubscription -Tenant $SUBSCRIPTION_ID;
-
 
     $OkToUpdateConfigFile = $false
-
-    #Create or check for existing resource group
-    $resourceGroup = Get-AzResourceGroup -Name $RESOURCEGROUP_NAME -ErrorAction SilentlyContinue
-    if(!$resourceGroup)
-    {
-        Write-Host "Resource group '$RESOURCEGROUP_NAME' does not exist. To create a new resource group, please enter a location.";
-        if(!$LOCATION) {
-            $LOCATION = Read-Host "LOCATION";
-        }
-        Write-Host -ForegroundColor DarkYellow "Creating resource group '$RESOURCEGROUP_NAME' in location '$LOCATION'";
-        New-AzResourceGroup -Name $RESOURCEGROUP_NAME -Location $LOCATION
-    }
-    else{
-        Write-Host -ForegroundColor Green "Using existing resource group '$RESOURCEGROUP_NAME'";
-    }
 
     # check if KeyVault exists and if not create it. 
     $keyVault = Get-AzKeyVault -VaultName $KeyVaultName -ErrorAction SilentlyContinue

@@ -1,10 +1,3 @@
-[CmdletBinding()]
-param(    
-    [PSCredential] $Credential,
-    [Parameter(Mandatory=$False, HelpMessage='Tenant ID (This is a GUID which represents the "Directory ID" of the AzureAD tenant into which you want to create the apps')]
-    [string] $tenantId
-)
-
 Import-Module AzureAD
 $ErrorActionPreference = 'Stop'
 
@@ -184,4 +177,10 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\parameters.ps1"
 
 
-CleanupUsers -Credential $Credential -tenantId $globalTenantId
+#CleanupUsers -Credential $Credential -tenantId $globalTenantId
+
+# Call the following once to clear cache 
+# Disconnect-AzureAD
+# Disconnect-AzAccount
+
+CleanupUsers

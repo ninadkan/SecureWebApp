@@ -1,12 +1,3 @@
-[CmdletBinding()]
-param(
-    [PSCredential] $Credential,
-    [Parameter(Mandatory=$False, HelpMessage='Tenant ID (This is a GUID which represents the "Directory ID" of the AzureAD tenant into which you want to create the apps')]
-    [string] $tenantId
-)
-
-
-
 # Create a password that can be used as an application key
 Function ComputePassword
 {
@@ -161,24 +152,45 @@ Function CreateGroupAndAddUser($groupName, $user, $firstUserName, $tenantName )
 
     if ($group)
     {
-        Add-AzureADGroupMember -ObjectId $group.ObjectId -RefObjectId $user.ObjectId
-
-        $password = "test123456789."
-        $userEmail = $firstUserName + "@" + $tenantName
-        $passwordProfile = New-Object Microsoft.Open.AzureAD.Model.PasswordProfile($password, $false, $false)
-
-        $newUSer = New-AzureADUser -DisplayName $firstUserName -PasswordProfile $passwordProfile -AccountEnabled $true -MailNickName $firstUserName -UserPrincipalName $userEmail
-
-        if ($newUser)
+        $groupMember = Get-AzureADGroupMember -ObjectId $group.ObjectId
+        if (-not $groupMember)
         {
-            Add-AzureADGroupMember -ObjectId $group.ObjectId -RefObjectId $newUSer.ObjectId
-            # grant access to Key vault to the user
-            Set-AzKeyVaultAccessPolicy -VaultName $KeyVaultName -ObjectId $newUSer.ObjectId -PermissionsToSecrets list,get
+            Add-AzureADGroupMember -ObjectId $group.ObjectId -RefObjectId $user.ObjectId
         }
         else
         {
-            Write-Host "Failed to create user '($firstUserName)'"
+            Write-Host "group already exists '($groupMember)'"
         }
+
+        $userEmail = $firstUserName + "@" + $tenantName
+
+        $newUSer = Get-AzureADUSer -Filter "startswith(UserPrincipalName, '$userEmail')"
+        if (-not $newUSer)
+        {
+         
+
+            $password = "test123456789."
+            
+            $passwordProfile = New-Object Microsoft.Open.AzureAD.Model.PasswordProfile($password, $false, $false)
+
+            $newUSer = New-AzureADUser -DisplayName $firstUserName -PasswordProfile $passwordProfile -AccountEnabled $true -MailNickName $firstUserName -UserPrincipalName $userEmail
+
+            if ($newUser)
+            {
+                Add-AzureADGroupMember -ObjectId $group.ObjectId -RefObjectId $newUSer.ObjectId
+                # grant access to Key vault to the user
+                Set-AzKeyVaultAccessPolicy -VaultName $KeyVaultName -ObjectId $newUSer.ObjectId -PermissionsToSecrets list,get
+            }
+            else
+            {
+                Write-Host "Failed to create user '($firstUserName)'"
+            }
+        } 
+        else
+        {
+            Write-Host "user already exists '($userEmail)'"
+        }      
+
     }
     else
     {
@@ -196,7 +208,7 @@ Function ApplyPermissions($appName, $permissions, $appObject)
 
 $global:serviceAppKey = $null
 $global:webAppKey = $null 
-#$serviceAppKey = $null
+$global:serviceIdentifierUri = $null
 #$webAppKey = $null
 $defaultServiceURL = "http://localhost:5555/"
 $defaultWebAppURL = "https://localhost:5001/"
@@ -207,73 +219,86 @@ Function CreateAndConfigureService($user, $tenantName)
 {
    # Create the service AAD application
    Write-Host "Creating the AAD application ($webServiceAppName))"
-   # Get a 2 years application key for the service Application
-   #$defaultURL = "https://localhost:5555/"
-   $pw = ComputePassword
-   $fromDate = [DateTime]::Now;
-   $key = CreateAppKey -fromDate $fromDate -durationInYears 2 -pw $pw
-   $global:serviceAppKey = $key
+
    $replayLogoutURL = $defaultServiceURL + "signout-oidc"
-   $serviceAadApplication = New-AzureADApplication -DisplayName $webServiceAppName `
-                                                   -HomePage $defaultServiceURL `
-                                                   -AvailableToOtherTenants $false `
-                                                   -LogoutUrl $replayLogoutURL `
-                                                   -ReplyUrls "http://localhost:5555/" `
-                                                   -PasswordCredentials $key `
-                                                   -PublicClient $False
-   $serviceIdentifierUri = 'api://'+$serviceAadApplication.AppId
-   Set-AzureADApplication -ObjectId $serviceAadApplication.ObjectId -IdentifierUris $serviceIdentifierUri
 
-   $currentAppId = $serviceAadApplication.AppId
-   $serviceServicePrincipal = New-AzureADServicePrincipal -AppId $currentAppId -Tags {WindowsAzureActiveDirectoryIntegratedApp}
+   $serviceAadApplication = Get-AzureADApplication -Filter "startswith(DisplayName, '$webServiceAppName')"
 
-   # add the user running the script as an app owner if needed
-   $owner = Get-AzureADApplicationOwner -ObjectId $serviceAadApplication.ObjectId
-   if ($owner -eq $null)
-   { 
-    Add-AzureADApplicationOwner -ObjectId $serviceAadApplication.ObjectId -RefObjectId $user.ObjectId
-    Write-Host "'$($user.UserPrincipalName)' added as an application owner to app '$($serviceServicePrincipal.DisplayName)'"
+   if (-not $serviceAadApplication)
+   {
+
+       # Get a 2 years application key for the service Application
+       #$defaultURL = "https://localhost:5555/"
+       $pw = ComputePassword
+       $fromDate = [DateTime]::Now;
+       $key = CreateAppKey -fromDate $fromDate -durationInYears 2 -pw $pw
+       $global:serviceAppKey = $key
+
+       $serviceAadApplication = New-AzureADApplication -DisplayName $webServiceAppName `
+                                                       -HomePage $defaultServiceURL `
+                                                       -AvailableToOtherTenants $false `
+                                                       -LogoutUrl $replayLogoutURL `
+                                                       -ReplyUrls "http://localhost:5555/" `
+                                                       -PasswordCredentials $key `
+                                                       -PublicClient $False
+       $global:serviceIdentifierUri = 'api://'+$serviceAadApplication.AppId
+       Set-AzureADApplication -ObjectId $serviceAadApplication.ObjectId -IdentifierUris $global:serviceIdentifierUri
+
+       $currentAppId = $serviceAadApplication.AppId
+       $serviceServicePrincipal = New-AzureADServicePrincipal -AppId $currentAppId -Tags {WindowsAzureActiveDirectoryIntegratedApp}
+
+       # add the user running the script as an app owner if needed
+       $owner = Get-AzureADApplicationOwner -ObjectId $serviceAadApplication.ObjectId
+       if ($owner -eq $null)
+       { 
+        Add-AzureADApplicationOwner -ObjectId $serviceAadApplication.ObjectId -RefObjectId $user.ObjectId
+        Write-Host "'$($user.UserPrincipalName)' added as an application owner to app '$($serviceServicePrincipal.DisplayName)'"
+       }
+
+       Write-Host "Done creating the service application ('$webServiceAppName'))"
+
+       # URL of the AAD application in the Azure portal
+       # Future? $servicePortalUrl = "https://portal.azure.com/#@"+$tenantName+"/blade/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/Overview/appId/"+$serviceAadApplication.AppId+"/objectId/"+$serviceAadApplication.ObjectId+"/isMSAApp/"
+       $servicePortalUrl = "https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/CallAnAPI/appId/"+$serviceAadApplication.AppId+"/objectId/"+$serviceAadApplication.ObjectId+"/isMSAApp/"
+       Add-Content -Value "<tr><td>service</td><td>$currentAppId</td><td><a href='$servicePortalUrl'>$webServiceAppName</a></td></tr>" -Path createdApps.html
+
+       $requiredResourcesAccess = New-Object System.Collections.Generic.List[Microsoft.Open.AzureAD.Model.RequiredResourceAccess]
+
+
+       # Add Required Resources Access (from 'service' to 'Microsoft Graph')
+       Write-Host "Getting access from 'service' to 'Microsoft Graph'"
+
+       #ApplyPermissions -appName "Microsoft Graph" -permissions "Directory.Read.All" -appObject $serviceAadApplication
+       #ApplyPermissions -appName "Azure Key Vault" -permissions "user_impersonation" -appObject $serviceAadApplication
+       #ApplyPermissions -appName "Azure Storage" -permissions "user_impersonation" -appObject $serviceAadApplication
+       #ApplyPermissions -appName "Microsoft.ServiceBus" -permissions "user_impersonation" -appObject $serviceAadApplication
+
+       $requiredPermissions = GetRequiredPermissions -applicationDisplayName "Microsoft Graph" -requiredDelegatedPermissions "User.Read" 
+       $requiredResourcesAccess.Add($requiredPermissions)
+
+
+       Write-Host "Getting access from 'service' to 'Azure Key Vault'"
+       $requiredPermissions = GetRequiredPermissions -applicationDisplayName "Azure Key Vault" -requiredDelegatedPermissions "user_impersonation" 
+       $requiredResourcesAccess.Add($requiredPermissions)
+
+
+       Write-Host "Getting access from 'service' to 'Azure Storage'"
+       $requiredPermissions = GetRequiredPermissions -applicationDisplayName "Azure Storage" -requiredDelegatedPermissions "user_impersonation" 
+       $requiredResourcesAccess.Add($requiredPermissions)
+
+
+       Write-Host "Getting access from 'service' to 'Microsoft.ServiceBus'"
+       $requiredPermissions = GetRequiredPermissions -applicationDisplayName "Microsoft.ServiceBus" -requiredDelegatedPermissions "user_impersonation"
+       $requiredResourcesAccess.Add($requiredPermissions)
+
+
+       Set-AzureADApplication -ObjectId $serviceAadApplication.ObjectId -RequiredResourceAccess $requiredResourcesAccess
+       Write-Host "Granted permissions to ($webServiceAppName)"
    }
-
-   Write-Host "Done creating the service application ('$webServiceAppName'))"
-
-   # URL of the AAD application in the Azure portal
-   # Future? $servicePortalUrl = "https://portal.azure.com/#@"+$tenantName+"/blade/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/Overview/appId/"+$serviceAadApplication.AppId+"/objectId/"+$serviceAadApplication.ObjectId+"/isMSAApp/"
-   $servicePortalUrl = "https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/CallAnAPI/appId/"+$serviceAadApplication.AppId+"/objectId/"+$serviceAadApplication.ObjectId+"/isMSAApp/"
-   Add-Content -Value "<tr><td>service</td><td>$currentAppId</td><td><a href='$servicePortalUrl'>$webServiceAppName</a></td></tr>" -Path createdApps.html
-
-   $requiredResourcesAccess = New-Object System.Collections.Generic.List[Microsoft.Open.AzureAD.Model.RequiredResourceAccess]
-
-
-   # Add Required Resources Access (from 'service' to 'Microsoft Graph')
-   Write-Host "Getting access from 'service' to 'Microsoft Graph'"
-
-   #ApplyPermissions -appName "Microsoft Graph" -permissions "Directory.Read.All" -appObject $serviceAadApplication
-   #ApplyPermissions -appName "Azure Key Vault" -permissions "user_impersonation" -appObject $serviceAadApplication
-   #ApplyPermissions -appName "Azure Storage" -permissions "user_impersonation" -appObject $serviceAadApplication
-   #ApplyPermissions -appName "Microsoft.ServiceBus" -permissions "user_impersonation" -appObject $serviceAadApplication
-
-   $requiredPermissions = GetRequiredPermissions -applicationDisplayName "Microsoft Graph" -requiredDelegatedPermissions "User.Read" 
-   $requiredResourcesAccess.Add($requiredPermissions)
-
-
-   Write-Host "Getting access from 'service' to 'Azure Key Vault'"
-   $requiredPermissions = GetRequiredPermissions -applicationDisplayName "Azure Key Vault" -requiredDelegatedPermissions "user_impersonation" 
-   $requiredResourcesAccess.Add($requiredPermissions)
-
-
-   Write-Host "Getting access from 'service' to 'Azure Storage'"
-   $requiredPermissions = GetRequiredPermissions -applicationDisplayName "Azure Storage" -requiredDelegatedPermissions "user_impersonation" 
-   $requiredResourcesAccess.Add($requiredPermissions)
-
-
-   Write-Host "Getting access from 'service' to 'Microsoft.ServiceBus'"
-   $requiredPermissions = GetRequiredPermissions -applicationDisplayName "Microsoft.ServiceBus" -requiredDelegatedPermissions "user_impersonation"
-   $requiredResourcesAccess.Add($requiredPermissions)
-
-
-   Set-AzureADApplication -ObjectId $serviceAadApplication.ObjectId -RequiredResourceAccess $requiredResourcesAccess
-   Write-Host "Granted permissions to ($webServiceAppName)"
+   else
+   {
+        Write-Host "Application already exists '$webServiceAppName'"
+   }
 
    return $serviceAadApplication
 }
@@ -285,69 +310,75 @@ Function CreateAndConfigureFrontEndApp($user, $tenantName)
    # Create the webApp AAD application
    Write-Host "Creating the AAD application ('$WebAppName')"
    
-
-   $pw = ComputePassword
-   $fromDate = [DateTime]::Now;
-   $key = CreateAppKey -fromDate $fromDate -durationInYears 2 -pw $pw
-   $global:webAppKey = $key
    $replayLogoutURL = $defaultWebAppURL + "signout-oidc"
    $replybackURL = $defaultWebAppURL + "signin-oidc"
    $IdentifierUris = "https://" + $tenantName + $WebAppName
 
+   $webAppAadApplication = Get-AzureADApplication -Filter "startswith(DisplayName, '$WebAppName')" 
+   if (-not $webAppAadApplication)
+   {
+       $pw = ComputePassword
+       $fromDate = [DateTime]::Now;
+       $key = CreateAppKey -fromDate $fromDate -durationInYears 2 -pw $pw
+       $global:webAppKey = $key
 
-
-   $webAppAadApplication = New-AzureADApplication -DisplayName $WebAppName `
-                                                  -HomePage $defaultWebAppURL `
-                                                  -LogoutUrl $replayLogoutURL `
-                                                  -ReplyUrls $defaultHTTPWebAppReplyURL, $replybackURL   `
-                                                  -IdentifierUris $IdentifierUris `
-                                                  -AvailableToOtherTenants $false `
-                                                  -PasswordCredentials $webAppKey `
-                                                  -Oauth2AllowImplicitFlow $false `
-                                                  -PublicClient $False
+       $webAppAadApplication = New-AzureADApplication -DisplayName $WebAppName `
+                                                      -HomePage $defaultWebAppURL `
+                                                      -LogoutUrl $replayLogoutURL `
+                                                      -ReplyUrls $defaultHTTPWebAppReplyURL, $replybackURL   `
+                                                      -IdentifierUris $IdentifierUris `
+                                                      -AvailableToOtherTenants $false `
+                                                      -PasswordCredentials $webAppKey `
+                                                      -Oauth2AllowImplicitFlow $false `
+                                                      -PublicClient $False
                                                   
 
-   $currentAppId = $webAppAadApplication.AppId
-   $webAppServicePrincipal = New-AzureADServicePrincipal -AppId $currentAppId -Tags {WindowsAzureActiveDirectoryIntegratedApp}
+       $currentAppId = $webAppAadApplication.AppId
+       $webAppServicePrincipal = New-AzureADServicePrincipal -AppId $currentAppId -Tags {WindowsAzureActiveDirectoryIntegratedApp}
 
-   # add the user running the script as an app owner if needed
-   $owner = Get-AzureADApplicationOwner -ObjectId $webAppAadApplication.ObjectId
-   if ($owner -eq $null)
-   { 
-    Add-AzureADApplicationOwner -ObjectId $webAppAadApplication.ObjectId -RefObjectId $user.ObjectId
-    Write-Host "'$($user.UserPrincipalName)' added as an application owner to app '$($webAppServicePrincipal.DisplayName)'"
+       # add the user running the script as an app owner if needed
+       $owner = Get-AzureADApplicationOwner -ObjectId $webAppAadApplication.ObjectId
+       if ($owner -eq $null)
+       { 
+        Add-AzureADApplicationOwner -ObjectId $webAppAadApplication.ObjectId -RefObjectId $user.ObjectId
+        Write-Host "'$($user.UserPrincipalName)' added as an application owner to app '$($webAppServicePrincipal.DisplayName)'"
+       }
+
+       Write-Host "Done creating the webApp application (WebApp)"
+
+       # URL of the AAD application in the Azure portal
+       # Future? $webAppPortalUrl = "https://portal.azure.com/#@"+$tenantName+"/blade/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/Overview/appId/"+$webAppAadApplication.AppId+"/objectId/"+$webAppAadApplication.ObjectId+"/isMSAApp/"
+       $webAppPortalUrl = "https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/CallAnAPI/appId/"+$webAppAadApplication.AppId+"/objectId/"+$webAppAadApplication.ObjectId+"/isMSAApp/"
+       Add-Content -Value "<tr><td>webApp</td><td>$currentAppId</td><td><a href='$webAppPortalUrl'>WebApp-GroupClaims</a></td></tr>" -Path createdApps.html
+
+       # Add Required Resources Access (from 'webApp' to 'Microsoft Graph')
+   
+
+       $requiredResourcesAccess = New-Object System.Collections.Generic.List[Microsoft.Open.AzureAD.Model.RequiredResourceAccess]
+
+       #ApplyPermissions -appName "Microsoft Graph" -permissions "Directory.Read.All" -appObject $webAppAadApplication
+       #ApplyPermissions -appName $webServiceAppName -permissions "user_impersonation" -appObject $webAppAadApplication
+       Write-Host "Getting access from '$WebAppName' to 'Microsoft Graph'"
+       #$r1 = GetRequiredPermissions -applicationDisplayName "Microsoft Graph" -requiredDelegatedPermissions "Directory.Read.All"
+       # Above was possibly giving us Error AADSTS650056: Misconfigured application.
+       $r1 = GetRequiredPermissions -applicationDisplayName "Microsoft Graph" -requiredDelegatedPermissions "User.Read"
+       $requiredResourcesAccess.Add($r1)
+
+       Write-Host "Getting access from '$WebAppName' to '$webServiceAppName'"
+       $r2 = GetRequiredPermissions -applicationDisplayName $webServiceAppName -requiredDelegatedPermissions "user_impersonation"
+       $requiredResourcesAccess.Add($r2)
+
+       Write-Host "Getting access from '$WebAppName' to 'Microsoft.Azure.ActiveDirectory'"
+       $r3 = GetRequiredPermissions -applicationDisplayName "Microsoft.Azure.ActiveDirectory" -requiredDelegatedPermissions "User.Read"
+       $requiredResourcesAccess.Add($r3)
+   
+       Set-AzureADApplication -ObjectId $webAppAadApplication.ObjectId -RequiredResourceAccess $requiredResourcesAccess
+       Write-Host "Granted permissions."
    }
-
-   Write-Host "Done creating the webApp application (WebApp)"
-
-   # URL of the AAD application in the Azure portal
-   # Future? $webAppPortalUrl = "https://portal.azure.com/#@"+$tenantName+"/blade/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/Overview/appId/"+$webAppAadApplication.AppId+"/objectId/"+$webAppAadApplication.ObjectId+"/isMSAApp/"
-   $webAppPortalUrl = "https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/CallAnAPI/appId/"+$webAppAadApplication.AppId+"/objectId/"+$webAppAadApplication.ObjectId+"/isMSAApp/"
-   Add-Content -Value "<tr><td>webApp</td><td>$currentAppId</td><td><a href='$webAppPortalUrl'>WebApp-GroupClaims</a></td></tr>" -Path createdApps.html
-
-   # Add Required Resources Access (from 'webApp' to 'Microsoft Graph')
-   
-
-   $requiredResourcesAccess = New-Object System.Collections.Generic.List[Microsoft.Open.AzureAD.Model.RequiredResourceAccess]
-
-   #ApplyPermissions -appName "Microsoft Graph" -permissions "Directory.Read.All" -appObject $webAppAadApplication
-   #ApplyPermissions -appName $webServiceAppName -permissions "user_impersonation" -appObject $webAppAadApplication
-   Write-Host "Getting access from '$WebAppName' to 'Microsoft Graph'"
-   #$r1 = GetRequiredPermissions -applicationDisplayName "Microsoft Graph" -requiredDelegatedPermissions "Directory.Read.All"
-   # Above was possibly giving us Error AADSTS650056: Misconfigured application.
-   $r1 = GetRequiredPermissions -applicationDisplayName "Microsoft Graph" -requiredDelegatedPermissions "User.Read"
-   $requiredResourcesAccess.Add($r1)
-
-   Write-Host "Getting access from '$WebAppName' to '$webServiceAppName'"
-   $r2 = GetRequiredPermissions -applicationDisplayName $webServiceAppName -requiredDelegatedPermissions "user_impersonation"
-   $requiredResourcesAccess.Add($r2)
-
-   Write-Host "Getting access from '$WebAppName' to 'Microsoft.Azure.ActiveDirectory'"
-   $r3 = GetRequiredPermissions -applicationDisplayName "Microsoft.Azure.ActiveDirectory" -requiredDelegatedPermissions "User.Read"
-   $requiredResourcesAccess.Add($r3)
-   
-   Set-AzureADApplication -ObjectId $webAppAadApplication.ObjectId -RequiredResourceAccess $requiredResourcesAccess
-   Write-Host "Granted permissions."
+   else
+   {
+        Write-Host "Application already exists '$WebAppName'"
+   }
 
    return $webAppAadApplication
 
@@ -357,8 +388,9 @@ Set-Content -Value "<html><body><table>" -Path createdApps.html
 Add-Content -Value "<thead><tr><th>Application</th><th>AppId</th><th>Url in the Azure portal</th></tr></thead><tbody>" -Path createdApps.html
 
 Function CreateRolesUsersAndRoleAssignments(
+    [Parameter(Mandatory=$True, HelpMessage='Credentials ID (This is a account credential to login to Azure subscription')]
     [PSCredential] $Credential,
-    [Parameter(Mandatory=$False, HelpMessage='Tenant ID (This is a GUID which represents the "Directory ID" of the AzureAD tenant into which you want to create the apps')]
+    [Parameter(Mandatory=$True, HelpMessage='Tenant ID (This is a GUID which represents the "Directory ID" of the AzureAD tenant into which you want to create the apps')]
     [string] $tenantId
 )
 {
@@ -431,80 +463,70 @@ Function CreateRolesUsersAndRoleAssignments(
    Add-Content -Value "</tbody></table></body></html>" -Path createdApps.html  
 
 
-    # Add application Roles
-    #$directoryViewerRole = CreateAppRole -Name "DirectoryViewers" -Description "Directory viewers can view objects in the whole directory."
-    #$userreaderRole = CreateAppRole -Name "UserReaders"  -Description "User readers can read basic profiles of all users in the directory"
-
-    #$appRoles = New-Object System.Collections.Generic.List[Microsoft.Open.AzureAD.Model.AppRole]
-    #$appRoles.Add($directoryViewerRole)
-    #$appRoles.Add($userreaderRole)
-        
-    # Add the roles
-    #Write-Host "Adding app roles to to the app 'WebApp-RolesClaims' in tenant '$tenantName'"
-
-    #$app=Get-AzureADApplication -Filter "DisplayName eq 'WebApp-RolesClaims'" 
-    
-    #if ($app)
-    #{
-    #    $servicePrincipal = Get-AzureADServicePrincipal -Filter "AppId eq '$($app.AppId)'"  
-    #    
-    #    Set-AzureADApplication -ObjectId $app.ObjectId -AppRoles $appRoles
-    #    Write-Host "Successfully added app roles to the app 'WebApp-RolesClaims'."
-
-     #   $appName = $app.DisplayName
-
-     #   Write-Host "Creating users and assigning them to roles."
-
-        # Create users
-        # ------
-        # Make sure that the user who is running this script is assigned to the Directory viewer role
-        #Write-Host "Adding '$($user.DisplayName)' as a member of the '$($directoryViewerRole.DisplayName)' role"
-        #$userAssignment = New-AzureADUserAppRoleAssignment -ObjectId $user.ObjectId -PrincipalId $user.ObjectId -ResourceId $servicePrincipal.ObjectId -Id $directoryViewerRole.Id
-
-        # Creating a directory viewer
-        ##Write-Host "Creating a user and assigning to '$($directoryViewerRole.DisplayName)' role"
-        #$aDirectoryViewer = CreateUserRepresentingAppRole $appName $directoryViewerRole $tenantName
-        #$userAssignment = New-AzureADUserAppRoleAssignment -ObjectId $aDirectoryViewer.ObjectId -PrincipalId $aDirectoryViewer.ObjectId -ResourceId $servicePrincipal.ObjectId -Id $directoryViewerRole.Id
-        #Write-Host "Created "($anApprover.UserPrincipalName)" with password 'test123456789.'"
-
-        # Creating a users reader
-        #Write-Host "Creating a user and assigning to '$($userreaderRole.DisplayName)' role"
-        #$auserreaderRole = CreateUserRepresentingAppRole $appName $userreaderRole $tenantName
-        #$userAssignment = New-AzureADUserAppRoleAssignment -ObjectId $auserreaderRole.ObjectId -PrincipalId $auserreaderRole.ObjectId -ResourceId $servicePrincipal.ObjectId -Id $userreaderRole.Id
-        #Write-Host "Created "($auserreaderRole.UserPrincipalName)" with password 'test123456789.'"
-    #}
-    #else {
-    #    Write-Host "Failed to add app roles to the app 'WebApp-RolesClaims'."
-    #}
 
    # Update config file for 'service'
-   $configFile = $pwd.Path + "\FlaskWebAPI\appSecrets.py"
-   Write-Host "Updating the sample code ($configFile)"
-   $dictionary = @{ "DomainName" = $tenantName;"TenantId" = $tenantId;"ClientId" = $serviceAadApplication.AppId;"ClientSecret" = $global:serviceAppKey.Value };
-   UpdateTextFile -configFilePath $configFile -dictionary $dictionary
+   # Updating the global keys in case the applications were not created in this run, but were created previously. 
 
-   # Update config file for 'client'
-   $configFile = $pwd.Path + "\MVCSecureApp\appsettings.json"
-   Write-Host "Updating the sample code ($configFile)"
+    if ($global:serviceIdentifierUri -eq $null)
+    {
+        Write-Host "Updating the global service URI variable"
+        $global:serviceIdentifierUri = 'api://' + $serviceAadApplication.AppId
+    }
 
-   $ServiceWebAPIURL = $defaultServiceURL + "todo/api/v1.0/tasks"
+    $dictionary = $null
+    if ($global:serviceAppKey -eq $null)
+    {
+        #Write-Host "Updating the global service Key variable"
+        #$SpId = Get-AzureADServicePrincipal -ObjectId $serviceAadApplication.AppId
+        #$key = Get-AzureADServicePrincipalKeyCredential -ObjectId $SpId
+        #$global:serviceAppKey = Get-AzureADApplicationKeyCredential  -ObjectId $SpId
+        $dictionary = @{ "DomainName" = $tenantName;"TenantId" = $tenantId;"ClientId" = $serviceAadApplication.AppId;"serviceIdentifierUri" = $global:serviceIdentifierUri };
+    }
+    else
+    {
+        $dictionary = @{ "DomainName" = $tenantName;"TenantId" = $tenantId;"ClientId" = $serviceAadApplication.AppId;"ClientSecret" = $global:serviceAppKey.Value; "serviceIdentifierUri" = $global:serviceIdentifierUri };
+    }
+    $configFile = $pwd.Path + "\FlaskWebAPI\appSecrets.py"
+    Write-Host "Updating the sample code ($configFile)"
+    UpdateTextFile -configFilePath $configFile -dictionary $dictionary
 
-   $dictionary = @{ "Domain" = $tenantName;"TenantId" = $tenantId;"ClientId" = $webAppAadApplication.AppId;"ClientSecret" = $global:webAppKey.Value; "WebAPIResourceId" = $serviceAadApplication.AppId; "WebAPIURL" = $ServiceWebAPIURL; "URL" = $ServiceWebAPIURL  };
-   UpdateTextFile -configFilePath $configFile -dictionary $dictionary
+    $dictionary = $null
+    $ServiceWebAPIURL = $defaultServiceURL + "todo/api/v1.0/tasks"
+    if ($global:webAppKey -eq $null)
+    {
+        #Write-Host "Updating the global web app  Key variable"
+        #$global:webAppKey = Get-AzureADApplicationKeyCredential  -ObjectId $webAppAadApplication.AppId
+        $dictionary = @{ "Domain" = $tenantName;"TenantId" = $tenantId;"ClientId" = $webAppAadApplication.AppId; "WebAPIResourceId" = $serviceAadApplication.AppId; "WebAPIURL" = $ServiceWebAPIURL; "URL" = $ServiceWebAPIURL  };
+    }
+    else
+    {
+        $dictionary = @{ "Domain" = $tenantName;"TenantId" = $tenantId;"ClientId" = $webAppAadApplication.AppId;"ClientSecret" = $global:webAppKey.Value; "WebAPIResourceId" = $serviceAadApplication.AppId; "WebAPIURL" = $ServiceWebAPIURL; "URL" = $ServiceWebAPIURL  };
+    }
+    # Update config file for 'web application'
+    $configFile = $pwd.Path + "\MVCSecureApp\appsettings.json"
+    Write-Host "Updating the sample code ($configFile)"
+    UpdateTextFile -configFilePath $configFile -dictionary $dictionary
 
-
-   #ReplaceSetting -configFilePath $configFile -key "ida:ClientId" -newValue $webAppAadApplication.AppId
-   #ReplaceSetting -configFilePath $configFile -key "todo:TodoListScope" -newValue ("api://"+$serviceAadApplication.AppId+"/user_impersonation")
-   #ReplaceSetting -configFilePath $configFile -key "todo:TodoListBaseAddress" -newValue $serviceAadApplication.HomePage
-   Write-Host ""
-   Write-Host "IMPORTANT: Please follow the instructions below to complete a few manual step(s) in the Azure portal":
-   Write-Host "- For 'service'"
-   Write-Host "  - Navigate to 'Service API'"
-   Write-Host "  - Navigate to the Manifest page and change 'signInAudience' to 'AzureADandPersonalMicrosoftAccount'."
-   Write-Host "  - [Optional] If you are a tenant admin, you can navigate to the API Permisions page and select 'Grant admin consent for (your tenant)'"
-   Write-Host "- For 'client'"
-   Write-Host "  - Navigate to 'Web API'"
-   Write-Host "  - Navigate to the Manifest page and change 'signInAudience' to 'AzureADandPersonalMicrosoftAccount'."
+    # Update config file for 'Java Client'
+    $dictionary = $null
+    $configFile = $pwd.Path + "\MVCSecureApp\Views\Jscript\Index.cshtml"
+    $authorityval = "https://login.microsoftonline.com/" + $tenantId
+    $WebApiArrayScope = "[" + $global:serviceIdentifierUri + "/user_impersonation ]"
+    $dictionary = @{ "authority:" = $authorityval;"clientID:" = $webAppAadApplication.AppId;"WebAPIURL:" = $ServiceWebAPIURL; "WebAPIScope:" = $WebApiArrayScope};
+    UpdateTextFile -configFilePath $configFile -dictionary $dictionary
+   
+    #ReplaceSetting -configFilePath $configFile -key "ida:ClientId" -newValue $webAppAadApplication.AppId
+    #ReplaceSetting -configFilePath $configFile -key "todo:TodoListScope" -newValue ("api://"+$serviceAadApplication.AppId+"/user_impersonation")
+    #ReplaceSetting -configFilePath $configFile -key "todo:TodoListBaseAddress" -newValue $serviceAadApplication.HomePage
+    Write-Host ""
+    Write-Host "IMPORTANT: Please follow the instructions below to complete a few manual step(s) in the Azure portal":
+    Write-Host "- For 'service'"
+    Write-Host "  - Navigate to 'Service API'"
+    Write-Host "  - Add Client Secret Manually if the service was created before - add reference to the appsecrets.py file'"
+    Write-Host "- For 'client'"
+    Write-Host "  - Navigate to 'Web App'"
+    Write-Host "  - Add Client Secret Manually if the web app  was created before - add reference to the appconfig.json'"
+  
 
     Write-Host -ForegroundColor Green "Run the ..\CleanupUsersAndRoles.ps1 command to remove users created for this sample's application ."
 }
@@ -527,5 +549,14 @@ Import-Module Az.KeyVault
 $ErrorActionPreference = 'Stop'
 
 . "$PSScriptRoot\parameters.ps1"
+#. "$PSScriptRoot\login.ps1"
 
-CreateRolesUsersAndRoleAssignments -Credential $Credential -tenantId $globalTenantId
+#$passwd = ConvertTo-SecureString '<<EnterPasswordHere>>' -AsPlainText -Force
+#$pscredential = New-Object System.Management.Automation.PSCredential('<<EnterUserNameHere>>', $passwd)
+# CreateRolesUsersAndRoleAssignments -tenantId $globalTenantId
+
+# Call the following once to clear cache 
+# Disconnect-AzureAD
+# Disconnect-AzAccount
+
+CreateRolesUsersAndRoleAssignments
